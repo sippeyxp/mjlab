@@ -13,3 +13,9 @@ from mjlab.asset_zoo.robots.unitree_go1.go1_constants import (
 from mjlab.asset_zoo.robots.unitree_go1.go1_constants import (
   get_go1_robot_cfg_learned as get_go1_robot_cfg_learned,
 )
+from mjlab.asset_zoo.robots.pupper.pupper_v3_constants import (
+  PUPPER_ACTION_SCALE as PUPPER_ACTION_SCALE,
+)
+from mjlab.asset_zoo.robots.pupper.pupper_v3_constants import (
+  get_pupper_v3_robot_cfg as get_pupper_v3_robot_cfg,
+)
