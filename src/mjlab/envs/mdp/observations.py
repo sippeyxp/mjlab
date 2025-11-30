@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 import torch
 
@@ -102,3 +102,8 @@ def builtin_sensor(env: ManagerBasedRlEnv, sensor_name: str) -> torch.Tensor:
   sensor = env.scene[sensor_name]
   assert isinstance(sensor, BuiltinSensor)
   return sensor.data
+
+# Sensor for debugging purposes
+
+def constant_sensor(env: ManagerBasedRlEnv, value: Sequence[float] | float) -> torch.Tensor:
+  return torch.tensor(value, device=env.device)

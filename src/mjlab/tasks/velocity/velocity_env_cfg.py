@@ -43,6 +43,11 @@ def make_velocity_env_cfg() -> ManagerBasedRlEnvCfg:
       params={"sensor_name": "robot/imu_lin_vel"},
       noise=Unoise(n_min=-0.5, n_max=0.5),
     ),
+    # "base_lin_vel": ObservationTermCfg(
+    #   func=mdp.constant_sensor,
+    #   params={"value": [[0., 0., 0.]]},
+    #   noise=Unoise(n_min=-0.5, n_max=0.5),
+    # ),
     "base_ang_vel": ObservationTermCfg(
       func=mdp.builtin_sensor,
       params={"sensor_name": "robot/imu_ang_vel"},

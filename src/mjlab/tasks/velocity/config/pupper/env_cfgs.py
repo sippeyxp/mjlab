@@ -86,15 +86,15 @@ def pupper_v3_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
     cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-  cfg.rewards["foot_clearance"].params["target_height"] = 0.05
+  cfg.rewards["foot_clearance"].params["target_height"] = 0.03
   cfg.rewards["foot_clearance"].weight = -2.0
-  cfg.rewards["foot_swing_height"].params["target_height"] = 0.05
+  cfg.rewards["foot_swing_height"].params["target_height"] = 0.03
   cfg.rewards["foot_swing_height"].weight = -1.0
 
   cfg.rewards["body_ang_vel"].weight = 0.0
   cfg.rewards["angular_momentum"].weight = 0.0
 
-  cfg.rewards["air_time"].weight = 1 # tune this
+  cfg.rewards["air_time"].weight = 0.2 # tune this
   cfg.rewards["air_time"].params["threshold_min"] = 0.05
   cfg.rewards["air_time"].params["threshold_max"] = 0.5
 
@@ -104,6 +104,13 @@ def pupper_v3_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   )
 
   cfg.rewards["action_rate_l2"].weight = -0.01
+
+
+  cfg.curriculum["command_vel"].params["velocity_stages"]= [
+          {"step": 0, "lin_vel_x": (-0.5, 0.5), "ang_vel_z": (-0.25, 0.25)},
+          {"step": 2000 * 24, "lin_vel_x": (-0.6, 0.8), "ang_vel_z": (-0.7, 0.7)},
+          {"step": 5000 * 24, "lin_vel_x": (-0.8, 1.2), "ang_vel_z": (-1.0, 1.0)},
+        ]
 
   # Apply play mode overrides.
   if play:
