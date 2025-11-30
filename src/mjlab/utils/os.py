@@ -84,7 +84,11 @@ def get_checkpoint_path(
   return run_path / checkpoint_file
 
 
-def get_wandb_checkpoint_path(log_path: Path, run_path: Path) -> tuple[Path, bool]:
+def get_wandb_checkpoint_path(
+    log_path: Path,
+    run_path: Path,
+    checkpoint: str = ".*"
+  ) -> tuple[Path, bool]:
   """Get checkpoint path from wandb, downloading if needed.
 
   Returns:
@@ -99,7 +103,9 @@ def get_wandb_checkpoint_path(log_path: Path, run_path: Path) -> tuple[Path, boo
   # Query wandb API to find the latest checkpoint.
   api = wandb.Api()
   wandb_run = api.run(str(run_path))
-  files = [file.name for file in wandb_run.files() if "model" in file.name]
+  files = [file.name for file in wandb_run.files() if re.match(checkpoint, file.name)]
+  if not files:
+    raise ValueError(f"No checkpoint found in {run_path} matching {checkpoint}")
   checkpoint_file = max(files, key=lambda x: int(x.split("_")[1].split(".")[0]))
   checkpoint_path = download_dir / checkpoint_file
 

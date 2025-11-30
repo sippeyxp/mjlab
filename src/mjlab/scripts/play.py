@@ -21,6 +21,11 @@ from mjlab.utils.wrappers import VideoRecorder
 from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
 
 
+import onnxruntime as ort
+import numpy as np
+
+
+
 @dataclass(frozen=True)
 class PlayConfig:
   agent: Literal["zero", "random", "trained"] = "trained"
@@ -36,9 +41,40 @@ class PlayConfig:
   video_width: int | None = None
   camera: int | str | None = None
   viewer: Literal["auto", "native", "viser"] = "auto"
+  onnx_policy: bool = False
 
   # Internal flag used by demo script.
   _demo_mode: tyro.conf.Suppress[bool] = False
+
+
+def get_onnx_policy(path: Path, device: str) -> callable:
+  """Get ONNX policy from path.
+
+  Args:
+    path: Path to ONNX model.
+    device: Device to run the policy on.
+
+  Returns:
+    Policy function.
+  """
+  sess_options = ort.SessionOptions()
+
+  if device == "cpu":
+    providers = ["CPUExecutionProvider"]
+  elif device.startswith("cuda"):
+    providers = ["CUDAExecutionProvider"]
+  else:
+    raise ValueError(f"Invalid device: {device}")
+  ort_session = ort.InferenceSession(str(path), sess_options, providers=providers)
+  input_name = ort_session.get_inputs()[0].name
+
+  def _policy(obs: torch.Tensor) -> torch.Tensor:
+    input_data = obs["policy"].cpu().numpy()
+    ort_inputs = {input_name: input_data}
+    ort_outputs = ort_session.run(None, ort_inputs)
+    return torch.from_numpy(ort_outputs[0]).to(device)
+
+  return _policy
 
 
 def run_play(task: str, cfg: PlayConfig):
@@ -113,6 +149,8 @@ def run_play(task: str, cfg: PlayConfig):
     log_root_path = (Path("logs") / "rsl_rl" / agent_cfg.experiment_name).resolve()
     if cfg.checkpoint_file is not None:
       resume_path = Path(cfg.checkpoint_file)
+      if cfg.onnx_policy:
+        resume_path = resume_path.with_suffix(".onnx")
       if not resume_path.exists():
         raise FileNotFoundError(f"Checkpoint file not found: {resume_path}")
       print(f"[INFO]: Loading checkpoint: {resume_path.name}")
@@ -122,7 +160,8 @@ def run_play(task: str, cfg: PlayConfig):
           "`wandb_run_path` is required when `checkpoint_file` is not provided."
         )
       resume_path, was_cached = get_wandb_checkpoint_path(
-        log_root_path, Path(cfg.wandb_run_path)
+        log_root_path, Path(cfg.wandb_run_path),
+        "model_.*.pt$" if not cfg.onnx_policy else "model_.*.onnx$"
       )
       # Extract run_id and checkpoint name from path for display.
       run_id = resume_path.parent.name
@@ -178,16 +217,19 @@ def run_play(task: str, cfg: PlayConfig):
 
       policy = PolicyRandom()
   else:
-    if is_tracking_task:
-      runner = MotionTrackingOnPolicyRunner(
-        env, asdict(agent_cfg), log_dir=str(log_dir), device=device
-      )
+    if not cfg.onnx_policy:
+      if is_tracking_task:
+        runner = MotionTrackingOnPolicyRunner(
+          env, asdict(agent_cfg), log_dir=str(log_dir), device=device
+        )
+      else:
+        runner = OnPolicyRunner(
+          env, asdict(agent_cfg), log_dir=str(log_dir), device=device
+        )
+      runner.load(str(resume_path), map_location=device)
+      policy = runner.get_inference_policy(device=device)
     else:
-      runner = OnPolicyRunner(
-        env, asdict(agent_cfg), log_dir=str(log_dir), device=device
-      )
-    runner.load(str(resume_path), map_location=device)
-    policy = runner.get_inference_policy(device=device)
+      policy = get_onnx_policy(resume_path, device=device)
 
   # Handle "auto" viewer selection.
   if cfg.viewer == "auto":
